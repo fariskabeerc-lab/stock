@@ -135,6 +135,21 @@ else:
 st.title("📦 Inventory Dashboard")
 st.markdown("---")
 
+# Global CSS to clean up UI (Center Tabs, Hide Download Button)
+st.markdown("""
+<style>
+/* Center the tabs for better mobile viewing */
+.stTabs [data-baseweb="tab-list"] {
+    justify-content: center;
+    margin-bottom: 20px;
+}
+/* Hide the download button across all dataframes */
+[data-testid="stDownloadButton"] {
+    display: none !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
 # Input for search query is now global/common
 query = st.text_input(
     "🔍 Search for Item Name or Barcode across all inventory:", 
@@ -183,15 +198,8 @@ else:
     filter_status = f"({f'Filtered by **{selected_category}**' if selected_category != 'All Categories' else 'All Stock'})"
 
     # Use st.tabs to create the two main pages below the search bar
-    st.markdown("""
-    <style>
-    .stTabs [data-baseweb="tab-list"] {
-        justify-content: center;
-        margin-bottom: 20px;
-    }
-    </style>
-    """, unsafe_allow_html=True) # Keeping a small style block to center the tabs.
-
+    # The CSS is now applied globally above
+    
     tab1, tab2 = st.tabs(["🏬 Warehouse Stock", "🆕 New Arrival"])
 
     with tab1:
