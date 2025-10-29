@@ -2,6 +2,35 @@ import streamlit as st
 import pandas as pd
 
 # ==========================================
+# CUSTOM CSS FOR AESTHETICS & ACTIVE TAB SHADE
+# ==========================================
+# Injecting CSS to style the active tab to have a "red shade" and ensure better mobile styling.
+st.markdown("""
+<style>
+/* Style for active tab to meet "red shade" requirement */
+.stTabs [data-baseweb="tab-list"] button[aria-selected="true"] {
+    background-color: #F8D7DA; /* Very Light Red/Pink Shade */
+    border-radius: 8px 8px 0 0;
+    color: #721C24; /* Dark Red Text */
+    border-bottom-color: #DC3545 !important; /* Strong Red Indicator */
+    border-bottom-width: 3px;
+    font-weight: 700;
+}
+/* Center the tabs below the search bar */
+.stTabs [data-baseweb="tab-list"] {
+    justify-content: center;
+    margin-bottom: 20px;
+}
+/* Adjust main content padding for better mobile fit */
+.block-container {
+    padding-top: 2rem;
+    padding-bottom: 2rem;
+}
+</style>
+""", unsafe_allow_html=True)
+
+
+# ==========================================
 # PAGE CONFIG
 # ==========================================
 st.set_page_config(page_title="Stock & New Arrival Dashboard", layout="wide")
@@ -12,7 +41,7 @@ st.set_page_config(page_title="Stock & New Arrival Dashboard", layout="wide")
 # ⚠️ Make sure both Excel files are in the same folder as this script.
 files = {
     "warehouse_stock": {
-        "path": "stock ware.xlsx",
+        "path": "stock ware.xlsx", # UPDATED PATH
         "date": "2025-10-29"
     },
     "new_arrival": {
@@ -57,80 +86,74 @@ data = {
     }
 }
 
-# ==========================================
-# SIDEBAR NAVIGATION
-# ==========================================
-page = st.sidebar.radio("📊 Select View", ["🏬 Warehouse Stock", "🆕 New Arrival", "🔍 Search Item"])
 
 # ==========================================
-# PAGE 1 — WAREHOUSE STOCK
+# COMMON SEARCH BAR (TOP)
 # ==========================================
-if page == "🏬 Warehouse Stock":
-    st.title("🏬 Warehouse Stock")
-    st.write(f"📅 Last Updated: **{data['stock']['date']}**")
+st.title("📦 Inventory Dashboard")
+st.markdown("---")
 
-    if not stock_df.empty:
-        # Display the main stock dataframe
-        st.dataframe(stock_df, use_container_width=True)
-    else:
-        st.warning(f"⚠️ Could not display data from **{files['warehouse_stock']['path']}**.")
-
-# ==========================================
-# PAGE 2 — NEW ARRIVAL
-# ==========================================
-elif page == "🆕 New Arrival":
-    st.title("🆕 New Arrival")
-    st.write(f"📅 Last Updated: **{data['new_arrival']['date']}**")
-
-    if not arrival_df.empty:
-        # Display the new arrival dataframe
-        st.dataframe(arrival_df, use_container_width=True)
-    else:
-        st.warning(f"⚠️ Could not display data from **{files['new_arrival']['path']}**.")
+# Input for search query is now global/common
+query = st.text_input(
+    "🔍 Search for Item Name or Barcode across all inventory:", 
+    placeholder="Enter Barcode or Item Description here...",
+    label_visibility="visible"
+).strip().lower()
 
 # ==========================================
-# PAGE 3 — SEARCH ITEM
+# SEARCH LOGIC AND DISPLAY
 # ==========================================
-elif page == "🔍 Search Item":
-    st.title("🔍 Search Item or Barcode")
-    st.markdown("Search across both **Warehouse Stock** and **New Arrivals** datasets.")
+if query:
+    st.subheader(f"Search Results for: **'{query}'**")
+    
+    # 1. Search warehouse stock
+    # We ensure that 'itembarcode' and 'description' columns exist before trying to access them
+    results_stock = stock_df[
+        stock_df.apply(lambda row: query in str(row.get("itembarcode", "")).lower() or
+                                   query in str(row.get("description", "")).lower(), axis=1)
+    ] if not stock_df.empty else pd.DataFrame()
 
-    # Input for search query
-    query = st.text_input("Enter Item Name or Barcode", placeholder="e.g., 87654321 or Blue T-Shirt").strip().lower()
+    # 2. Search new arrivals
+    results_arrival = arrival_df[
+        arrival_df.apply(lambda row: query in str(row.get("itembarcode", "")).lower() or
+                                     query in str(row.get("description", "")).lower(), axis=1)
+    ] if not arrival_df.empty else pd.DataFrame()
 
-    if query:
-        # Search function logic (using 'itembarcode' and 'description' columns)
+    if not results_stock.empty or not results_arrival.empty:
         
-        # 1. Search warehouse stock
-        results_stock = stock_df[
-            stock_df.apply(lambda row: query in str(row.get("itembarcode", "")).lower() or
-                                       query in str(row.get("description", "")).lower(), axis=1)
-        ] if not stock_df.empty else pd.DataFrame()
-
-        # 2. Search new arrivals
-        results_arrival = arrival_df[
-            arrival_df.apply(lambda row: query in str(row.get("itembarcode", "")).lower() or
-                                         query in str(row.get("description", "")).lower(), axis=1)
-        ] if not arrival_df.empty else pd.DataFrame()
-
-        if not results_stock.empty or not results_arrival.empty:
-            
-            # Display Stock results if found
-            if not results_stock.empty:
-                st.subheader("🏬 Results in Warehouse Stock")
-                st.dataframe(results_stock, use_container_width=True)
-            
-            # Display Arrival results if found
-            if not results_arrival.empty:
-                st.subheader("🆕 Results in New Arrivals")
-                st.dataframe(results_arrival, use_container_width=True)
-        else:
-            st.warning(f"❌ No matching items found for **'{query}'** in either dataset.")
+        # Display Stock results if found
+        if not results_stock.empty:
+            st.markdown("### 🏬 Found in Warehouse Stock")
+            st.dataframe(results_stock, use_container_width=True)
+        
+        # Display Arrival results if found
+        if not results_arrival.empty:
+            st.markdown("### 🆕 Found in New Arrivals")
+            st.dataframe(results_arrival, use_container_width=True)
     else:
-        st.info("Type an item name or barcode into the search box above to begin.")
+        st.warning(f"❌ No matching items found for **'{query}'** in either dataset.")
+        
+# ==========================================
+# TABBED PAGE VIEWS (If no search query is active)
+# ==========================================
+else:
+    # Use st.tabs to create the two main pages below the search bar
+    tab1, tab2 = st.tabs(["🏬 Warehouse Stock", "🆕 New Arrival"])
 
-# ==========================================
-# OPTIONAL: SHOW JSON STRUCTURE
-# ==========================================
-with st.expander("🧾 View JSON Data Structure (Debugging Only)"):
-    st.json(data)
+    with tab1:
+        st.subheader("Current Warehouse Inventory")
+        st.write(f"📅 Last Updated: **{data['stock']['date']}**")
+
+        if not stock_df.empty:
+            st.dataframe(stock_df, use_container_width=True)
+        else:
+            st.warning(f"⚠️ Could not display data from **{files['warehouse_stock']['path']}**.")
+
+    with tab2:
+        st.subheader("Incoming Inventory (New Shipments)")
+        st.write(f"📅 Last Updated: **{data['new_arrival']['date']}**")
+
+        if not arrival_df.empty:
+            st.dataframe(arrival_df, use_container_width=True)
+        else:
+            st.warning(f"⚠️ Could not display data from **{files['new_arrival']['path']}**.")
