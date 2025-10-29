@@ -59,13 +59,42 @@ data = {
 
 
 # ==========================================
+# CONFIGURATION CONSTANTS FOR DISPLAY/FILTERING
+# ==========================================
+CATEGORY_COLUMN = "Category" # Column used for sidebar filtering
+COST_COLUMN = "cost"         # Assumed column to be renamed
+SELLING_COLUMN = "selling"   # New column name
+
+
+# ==========================================
+# HELPER FUNCTION FOR DISPLAY FORMATTING
+# ==========================================
+def format_df_for_display(df):
+    """
+    Creates a copy of the DataFrame, drops the category column, 
+    and renames the cost column to selling for presentation.
+    """
+    # Defensive copy to avoid modifying the cached original DataFrame
+    df_display = df.copy() 
+    
+    # 1. Drop Category Column (Requested by user)
+    if CATEGORY_COLUMN in df_display.columns:
+        df_display = df_display.drop(columns=[CATEGORY_COLUMN])
+    
+    # 2. Rename Cost Column to Selling (Requested by user)
+    # Note: We assume the column is exactly named 'cost'
+    if COST_COLUMN in df_display.columns:
+        df_display = df_display.rename(columns={COST_COLUMN: SELLING_COLUMN})
+        
+    return df_display
+
+
+# ==========================================
 # SIDEBAR FILTERING
 # ==========================================
 st.sidebar.title("Filter Options")
 
 # --- Category Filter Logic ---
-CATEGORY_COLUMN = "Category" # <<< ASSUMED COLUMN NAME - CHANGE IF NEEDED!
-
 # Check if the assumed category column exists in both dataframes
 if CATEGORY_COLUMN in stock_df.columns and CATEGORY_COLUMN in arrival_df.columns:
     
@@ -134,15 +163,15 @@ if query:
 
     if not results_stock.empty or not results_arrival.empty:
         
-        # Display Stock results if found
+        # Display Stock results if found, applying display formatting
         if not results_stock.empty:
             st.markdown("### 🏬 Found in Warehouse Stock")
-            st.dataframe(results_stock, use_container_width=True)
+            st.dataframe(format_df_for_display(results_stock), use_container_width=True)
         
-        # Display Arrival results if found
+        # Display Arrival results if found, applying display formatting
         if not results_arrival.empty:
             st.markdown("### 🆕 Found in New Arrivals")
-            st.dataframe(results_arrival, use_container_width=True)
+            st.dataframe(format_df_for_display(results_arrival), use_container_width=True)
     else:
         st.warning(f"❌ No matching items found for **'{query}'** in either dataset.")
         
@@ -166,8 +195,9 @@ else:
         st.subheader(f"Current Warehouse Inventory ({'Filtered' if selected_category != 'All Categories' else 'All Stock'})")
         st.write(f"📅 Last Updated: **{data['stock']['date']}**")
 
+        # Display filtered stock, applying display formatting
         if not filtered_stock_df.empty:
-            st.dataframe(filtered_stock_df, use_container_width=True)
+            st.dataframe(format_df_for_display(filtered_stock_df), use_container_width=True)
         elif not stock_df.empty:
             # Show a warning if the data is filtered out, but the original DF wasn't empty
             st.info(f"No items found in Warehouse Stock for category: **{selected_category}**.")
@@ -178,8 +208,9 @@ else:
         st.subheader(f"Incoming Inventory (New Shipments) ({'Filtered' if selected_category != 'All Categories' else 'All Stock'})")
         st.write(f"📅 Last Updated: **{data['new_arrival']['date']}**")
 
+        # Display filtered arrival, applying display formatting
         if not filtered_arrival_df.empty:
-            st.dataframe(filtered_arrival_df, use_container_width=True)
+            st.dataframe(format_df_for_display(filtered_arrival_df), use_container_width=True)
         elif not arrival_df.empty:
             # Show a warning if the data is filtered out, but the original DF wasn't empty
             st.info(f"No items found in New Arrivals for category: **{selected_category}**.")
