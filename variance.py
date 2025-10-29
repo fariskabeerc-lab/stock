@@ -4,30 +4,7 @@ import pandas as pd
 # ==========================================
 # CUSTOM CSS FOR AESTHETICS & ACTIVE TAB SHADE
 # ==========================================
-# Injecting CSS to style the active tab to have a "red shade" and ensure better mobile styling.
-st.markdown("""
-<style>
-/* Style for active tab to meet "red shade" requirement */
-.stTabs [data-baseweb="tab-list"] button[aria-selected="true"] {
-    background-color: #F8D7DA; /* Very Light Red/Pink Shade */
-    border-radius: 8px 8px 0 0;
-    color: #721C24; /* Dark Red Text */
-    border-bottom-color: #DC3545 !important; /* Strong Red Indicator */
-    border-bottom-width: 3px;
-    font-weight: 700;
-}
-/* Center the tabs below the search bar */
-.stTabs [data-baseweb="tab-list"] {
-    justify-content: center;
-    margin-bottom: 20px;
-}
-/* Adjust main content padding for better mobile fit */
-.block-container {
-    padding-top: 2rem;
-    padding-bottom: 2rem;
-}
-</style>
-""", unsafe_allow_html=True)
+# Removed custom CSS block to revert to default Streamlit tab styling.
 
 
 # ==========================================
@@ -138,6 +115,16 @@ if query:
 # ==========================================
 else:
     # Use st.tabs to create the two main pages below the search bar
+    # Using a container here to help enforce standard spacing since custom CSS was removed
+    st.markdown("""
+    <style>
+    .stTabs [data-baseweb="tab-list"] {
+        justify-content: center;
+        margin-bottom: 20px;
+    }
+    </style>
+    """, unsafe_allow_html=True) # Keeping a small style block to center the tabs.
+
     tab1, tab2 = st.tabs(["🏬 Warehouse Stock", "🆕 New Arrival"])
 
     with tab1:
