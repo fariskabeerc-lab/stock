@@ -6,61 +6,56 @@ import pandas as pd
 # ==========================================
 st.set_page_config(page_title="Stock & New Arrival Dashboard", layout="wide")
 
-st.title("📦 Warehouse & New Arrival Dashboard")
-
 # ==========================================
-# MANUAL FILE DATES (EDIT HERE)
+# MANUAL FILE NAMES AND DATES
 # ==========================================
+# ⚠️ Make sure both Excel files are in the same folder as this script.
 files = {
-    "logistic stock-29-10-2025.xlsx": "2025-10-29",
-    "NEW ARRAIVAL-27-OCT-25 (1).xlsx": "2025-10-29"
+    "warehouse_stock": {
+        "path": "logistic stock-29-10-2025.xlsx",
+        "date": "2025-10-29"
+    },
+    "new_arrival": {
+        "path": "NEW ARRAIVAL-27-OCT-25 (1).xlsx",
+        "date": "2025-10-29"
+    }
 }
 
 # ==========================================
-# FILE UPLOAD SECTION
+# LOAD DATA FUNCTION
 # ==========================================
-st.sidebar.header("📤 Upload Excel Files")
-
-uploaded_stock = st.sidebar.file_uploader("Upload Warehouse Stock File", type=["xlsx"])
-uploaded_arrival = st.sidebar.file_uploader("Upload New Arrival File", type=["xlsx"])
-
-# ==========================================
-# LOAD EXCEL FUNCTION
-# ==========================================
-def read_excel(uploaded_file):
+@st.cache_data
+def load_excel(file_path):
     try:
-        if uploaded_file is not None:
-            df = pd.read_excel(uploaded_file)
-            df.columns = df.columns.str.strip()
-            return df
-        else:
-            return pd.DataFrame()
+        df = pd.read_excel(file_path)
+        df.columns = df.columns.str.strip()
+        return df
     except Exception as e:
-        st.error(f"❌ Error reading file: {e}")
+        st.error(f"❌ Error loading {file_path}: {e}")
         return pd.DataFrame()
 
 # ==========================================
 # READ BOTH FILES
 # ==========================================
-stock_df = read_excel(uploaded_stock)
-arrival_df = read_excel(uploaded_arrival)
+stock_df = load_excel(files["warehouse_stock"]["path"])
+arrival_df = load_excel(files["new_arrival"]["path"])
 
 # ==========================================
-# DATA STRUCTURE
+# DATA STRUCTURE (for internal use)
 # ==========================================
 data = {
     "stock": {
-        "data": stock_df.to_dict(orient="records") if not stock_df.empty else [],
-        "date": files["warehouse_stock.xlsx"]
+        "data": stock_df.to_dict(orient="records"),
+        "date": files["warehouse_stock"]["date"]
     },
     "new_arrival": {
-        "data": arrival_df.to_dict(orient="records") if not arrival_df.empty else [],
-        "date": files["new_arrival.xlsx"]
+        "data": arrival_df.to_dict(orient="records"),
+        "date": files["new_arrival"]["date"]
     }
 }
 
 # ==========================================
-# PAGE NAVIGATION
+# SIDEBAR NAVIGATION
 # ==========================================
 page = st.sidebar.radio("📊 Select View", ["🏬 Warehouse Stock", "🆕 New Arrival", "🔍 Search Item"])
 
@@ -68,40 +63,42 @@ page = st.sidebar.radio("📊 Select View", ["🏬 Warehouse Stock", "🆕 New A
 # PAGE 1 — WAREHOUSE STOCK
 # ==========================================
 if page == "🏬 Warehouse Stock":
-    st.header("🏬 Warehouse Stock Data")
+    st.title("🏬 Warehouse Stock")
     st.write(f"📅 Date: **{data['stock']['date']}**")
 
     if not stock_df.empty:
         st.dataframe(stock_df, use_container_width=True)
     else:
-        st.info("Please upload the warehouse_stock.xlsx file.")
+        st.warning("⚠️ No data found in warehouse_stock.xlsx")
 
 # ==========================================
 # PAGE 2 — NEW ARRIVAL
 # ==========================================
 elif page == "🆕 New Arrival":
-    st.header("🆕 New Arrival Data")
+    st.title("🆕 New Arrival")
     st.write(f"📅 Date: **{data['new_arrival']['date']}**")
 
     if not arrival_df.empty:
         st.dataframe(arrival_df, use_container_width=True)
     else:
-        st.info("Please upload the new_arrival.xlsx file.")
+        st.warning("⚠️ No data found in new_arrival.xlsx")
 
 # ==========================================
 # PAGE 3 — SEARCH ITEM
 # ==========================================
 elif page == "🔍 Search Item":
-    st.header("🔍 Search by Item Name or Barcode")
+    st.title("🔍 Search for Item or Barcode")
 
     query = st.text_input("Enter Item Name or Barcode").strip().lower()
 
     if query:
+        # Search warehouse stock
         results_stock = stock_df[
             stock_df.apply(lambda row: query in str(row.get("itembarcode", "")).lower() or
                            query in str(row.get("description", "")).lower(), axis=1)
         ] if not stock_df.empty else pd.DataFrame()
 
+        # Search new arrivals
         results_arrival = arrival_df[
             arrival_df.apply(lambda row: query in str(row.get("itembarcode", "")).lower() or
                              query in str(row.get("description", "")).lower(), axis=1)
@@ -115,12 +112,12 @@ elif page == "🔍 Search Item":
                 st.subheader("🆕 Found in New Arrivals")
                 st.dataframe(results_arrival, use_container_width=True)
         else:
-            st.warning("No matching items found in either file.")
+            st.warning("❌ No matching items found.")
     else:
-        st.info("Type something to search.")
+        st.info("Type an item name or barcode to search.")
 
 # ==========================================
-# JSON STRUCTURE PREVIEW
+# OPTIONAL: SHOW JSON STRUCTURE
 # ==========================================
 with st.expander("🧾 View JSON Data Structure"):
     st.json(data)
