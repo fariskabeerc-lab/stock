@@ -12,7 +12,7 @@ st.set_page_config(page_title="Stock & New Arrival Dashboard", layout="wide")
 # ⚠️ Make sure both Excel files are in the same folder as this script.
 files = {
     "warehouse_stock": {
-        "path": "logistic stock-29-10-2025.xlsx",
+        "path": "logistic stock-29-10-2025.xls",
         "date": "2025-10-29"
     },
     "new_arrival": {
