@@ -143,10 +143,12 @@ st.markdown("""
     justify-content: center;
     margin-bottom: 20px;
 }
-/* Hide the download button: targets the second button in the dataframe toolbar */
-/* This is a more robust fix for the "Download as CSV" button */
-[data-testid^="stDataFrameToolbar"] button:nth-child(2) {
-    display: none !important;
+/* Updated Aggressive CSS: 
+    Targets the container (often a div) holding the Download button,
+    which is typically the second child in the stDataFrameToolbar. 
+*/
+[data-testid^="stDataFrameToolbar"] > div:nth-child(2) {
+    display: none !important; 
 }
 </style>
 """, unsafe_allow_html=True)
