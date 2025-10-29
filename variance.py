@@ -179,6 +179,9 @@ if query:
 # TABBED PAGE VIEWS (If no search query is active)
 # ==========================================
 else:
+    # Determine the status text based on category selection
+    filter_status = f"({f'Filtered by **{selected_category}**' if selected_category != 'All Categories' else 'All Stock'})"
+
     # Use st.tabs to create the two main pages below the search bar
     st.markdown("""
     <style>
@@ -192,8 +195,8 @@ else:
     tab1, tab2 = st.tabs(["🏬 Warehouse Stock", "🆕 New Arrival"])
 
     with tab1:
-        st.subheader(f"Current Warehouse Inventory ({'Filtered' if selected_category != 'All Categories' else 'All Stock'})")
-        st.write(f"📅 Last Updated: **{data['stock']['date']}**")
+        st.subheader("🏬 Warehouse Stock")
+        st.write(f"📅 Last Updated: **{data['stock']['date']}** {filter_status}")
 
         # Display filtered stock, applying display formatting
         if not filtered_stock_df.empty:
@@ -205,8 +208,8 @@ else:
             st.warning(f"⚠️ Could not display data from **{files['warehouse_stock']['path']}**.")
 
     with tab2:
-        st.subheader(f"Incoming Inventory (New Shipments) ({'Filtered' if selected_category != 'All Categories' else 'All Stock'})")
-        st.write(f"📅 Last Updated: **{data['new_arrival']['date']}**")
+        st.subheader("🆕 New Arrival")
+        st.write(f"📅 Last Updated: **{data['new_arrival']['date']}** {filter_status}")
 
         # Display filtered arrival, applying display formatting
         if not filtered_arrival_df.empty:
