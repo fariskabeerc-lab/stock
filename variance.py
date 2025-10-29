@@ -2,12 +2,6 @@ import streamlit as st
 import pandas as pd
 
 # ==========================================
-# CUSTOM CSS FOR AESTHETICS & ACTIVE TAB SHADE
-# ==========================================
-# Removed custom CSS block to revert to default Streamlit tab styling.
-
-
-# ==========================================
 # PAGE CONFIG
 # ==========================================
 st.set_page_config(page_title="Stock & New Arrival Dashboard", layout="wide")
@@ -65,6 +59,48 @@ data = {
 
 
 # ==========================================
+# SIDEBAR FILTERING
+# ==========================================
+st.sidebar.title("Filter Options")
+
+# --- Category Filter Logic ---
+CATEGORY_COLUMN = "Category" # <<< ASSUMED COLUMN NAME - CHANGE IF NEEDED!
+
+# Check if the assumed category column exists in both dataframes
+if CATEGORY_COLUMN in stock_df.columns and CATEGORY_COLUMN in arrival_df.columns:
+    
+    # Get all unique categories from both dataframes
+    all_categories = pd.concat([
+        stock_df[CATEGORY_COLUMN].dropna().astype(str),
+        arrival_df[CATEGORY_COLUMN].dropna().astype(str)
+    ]).str.strip().unique().tolist()
+    all_categories.sort()
+    all_categories.insert(0, "All Categories")
+
+    # Create the single-select filter
+    selected_category = st.sidebar.selectbox(
+        "Select Inventory Category", 
+        all_categories,
+        index=0 # Default to "All Categories"
+    )
+    
+    # Prepare the filtered dataframes
+    if selected_category != "All Categories":
+        # Filter logic: convert column to string and strip spaces for safe comparison
+        filtered_stock_df = stock_df[stock_df[CATEGORY_COLUMN].astype(str).str.strip() == selected_category]
+        filtered_arrival_df = arrival_df[arrival_df[CATEGORY_COLUMN].astype(str).str.strip() == selected_category]
+    else:
+        filtered_stock_df = stock_df
+        filtered_arrival_df = arrival_df
+
+else:
+    st.sidebar.warning(f"⚠️ Cannot find '{CATEGORY_COLUMN}' column. Displaying unfiltered data.")
+    selected_category = "All Categories" # Bypass filtering logic
+    filtered_stock_df = stock_df
+    filtered_arrival_df = arrival_df
+
+
+# ==========================================
 # COMMON SEARCH BAR (TOP)
 # ==========================================
 st.title("📦 Inventory Dashboard")
@@ -79,18 +115,18 @@ query = st.text_input(
 
 # ==========================================
 # SEARCH LOGIC AND DISPLAY
+# NOTE: Search always operates on the full, unfiltered stock_df and arrival_df
 # ==========================================
 if query:
     st.subheader(f"Search Results for: **'{query}'**")
     
-    # 1. Search warehouse stock
-    # We ensure that 'itembarcode' and 'description' columns exist before trying to access them
+    # 1. Search warehouse stock (using original, unfiltered DF)
     results_stock = stock_df[
         stock_df.apply(lambda row: query in str(row.get("itembarcode", "")).lower() or
                                    query in str(row.get("description", "")).lower(), axis=1)
     ] if not stock_df.empty else pd.DataFrame()
 
-    # 2. Search new arrivals
+    # 2. Search new arrivals (using original, unfiltered DF)
     results_arrival = arrival_df[
         arrival_df.apply(lambda row: query in str(row.get("itembarcode", "")).lower() or
                                      query in str(row.get("description", "")).lower(), axis=1)
@@ -115,7 +151,6 @@ if query:
 # ==========================================
 else:
     # Use st.tabs to create the two main pages below the search bar
-    # Using a container here to help enforce standard spacing since custom CSS was removed
     st.markdown("""
     <style>
     .stTabs [data-baseweb="tab-list"] {
@@ -128,19 +163,25 @@ else:
     tab1, tab2 = st.tabs(["🏬 Warehouse Stock", "🆕 New Arrival"])
 
     with tab1:
-        st.subheader("Current Warehouse Inventory")
+        st.subheader(f"Current Warehouse Inventory ({'Filtered' if selected_category != 'All Categories' else 'All Stock'})")
         st.write(f"📅 Last Updated: **{data['stock']['date']}**")
 
-        if not stock_df.empty:
-            st.dataframe(stock_df, use_container_width=True)
+        if not filtered_stock_df.empty:
+            st.dataframe(filtered_stock_df, use_container_width=True)
+        elif not stock_df.empty:
+            # Show a warning if the data is filtered out, but the original DF wasn't empty
+            st.info(f"No items found in Warehouse Stock for category: **{selected_category}**.")
         else:
             st.warning(f"⚠️ Could not display data from **{files['warehouse_stock']['path']}**.")
 
     with tab2:
-        st.subheader("Incoming Inventory (New Shipments)")
+        st.subheader(f"Incoming Inventory (New Shipments) ({'Filtered' if selected_category != 'All Categories' else 'All Stock'})")
         st.write(f"📅 Last Updated: **{data['new_arrival']['date']}**")
 
-        if not arrival_df.empty:
-            st.dataframe(arrival_df, use_container_width=True)
+        if not filtered_arrival_df.empty:
+            st.dataframe(filtered_arrival_df, use_container_width=True)
+        elif not arrival_df.empty:
+            # Show a warning if the data is filtered out, but the original DF wasn't empty
+            st.info(f"No items found in New Arrivals for category: **{selected_category}**.")
         else:
             st.warning(f"⚠️ Could not display data from **{files['new_arrival']['path']}**.")
