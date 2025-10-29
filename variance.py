@@ -1,98 +1,113 @@
 import streamlit as st
 import pandas as pd
-import plotly.express as px
-import os
 
-# --- PAGE CONFIG ---
-st.set_page_config(page_title="Healthy Stock Dashboard", layout="wide")
+# ==========================================
+# PAGE CONFIG
+# ==========================================
+st.set_page_config(page_title="Stock & New Arrival Dashboard", layout="wide")
 
-# --- LOAD FILES ---
-SALES_FILE = "full sales of 2025 safa.Xlsx"
-AGING_FILE = "safa aging.xlsx"
+# ==========================================
+# MANUAL FILES AND DATES (EDIT HERE)
+# ==========================================
+files = {
+    "logistic stock-29-10-2025.xlsx": "2025-10-29",
+    "NEW ARRAIVAL-27-OCT-25 (1).xlsx": "2025-10-29"
+}
 
-# --- READ DATA ---
-if os.path.exists(SALES_FILE):
-    sales_df = pd.read_excel(SALES_FILE)
-else:
-    st.error(f"❌ '{SALES_FILE}' not found. Please add your sales data file.")
-    st.stop()
+# ==========================================
+# LOAD DATA FUNCTION
+# ==========================================
+@st.cache_data
+def load_excel(file_path):
+    try:
+        df = pd.read_excel(file_path)
+        df.columns = df.columns.str.strip()
+        return df
+    except Exception as e:
+        st.error(f"Error loading {file_path}: {e}")
+        return pd.DataFrame()
 
-if os.path.exists(AGING_FILE):
-    aging_df = pd.read_excel(AGING_FILE)
-else:
-    st.warning(f"⚠️ '{AGING_FILE}' not found. Aging-related features will be disabled.")
-    aging_df = pd.DataFrame()
+# ==========================================
+# LOAD FILES INTO STRUCTURE
+# ==========================================
+stock_df = load_excel("warehouse_stock.xlsx")
+arrival_df = load_excel("new_arrival.xlsx")
 
-# --- CLEAN & STANDARDIZE COLUMN NAMES ---
-sales_df.columns = sales_df.columns.str.strip().str.replace("\n", " ")
-aging_df.columns = aging_df.columns.str.strip().str.replace("\n", " ")
+data = {
+    "stock": {
+        "data": stock_df.to_dict(orient="records"),
+        "date": files["warehouse_stock.xlsx"]
+    },
+    "new_arrival": {
+        "data": arrival_df.to_dict(orient="records"),
+        "date": files["new_arrival.xlsx"]
+    }
+}
 
-# --- MERGE SALES + AGING DATA ---
-merge_keys = ["Item Name", "Category", "Barcode"]
-common_keys = [key for key in merge_keys if key in sales_df.columns and key in aging_df.columns]
-merged_df = pd.merge(sales_df, aging_df, how="left", on=common_keys)
+# ==========================================
+# SIDEBAR NAVIGATION
+# ==========================================
+page = st.sidebar.radio("📊 Select View", ["🏬 Warehouse Stock", "📦 New Arrival", "🔍 Search Item"])
 
-# --- CALCULATE AVERAGE MONTHLY SALES ---
-sales_cols = [col for col in merged_df.columns if "Total Sales" in col]
-if sales_cols:
-    merged_df["Average Monthly Sales"] = merged_df[sales_cols].mean(axis=1)
-else:
-    st.error("No 'Total Sales' columns found in sales data.")
-    st.stop()
+# ==========================================
+# PAGE 1 — WAREHOUSE STOCK
+# ==========================================
+if page == "🏬 Warehouse Stock":
+    st.title("🏬 Warehouse Stock")
+    st.write(f"📅 Date: **{data['stock']['date']}**")
 
-# --- SAFETY FACTOR (Months of Cover) ---
-if "Stock" in merged_df.columns:
-    merged_df["Safety Factor (Months of Cover)"] = merged_df["Stock"] / merged_df["Average Monthly Sales"]
-else:
-    st.error("No 'Stock' column found in aging data. Please include stock quantity.")
-    st.stop()
+    if not stock_df.empty:
+        st.dataframe(stock_df, use_container_width=True)
+    else:
+        st.warning("No warehouse stock data found.")
 
-# --- FILTERS (SIDEBAR) ---
-st.sidebar.header("🔍 Filters")
+# ==========================================
+# PAGE 2 — NEW ARRIVAL
+# ==========================================
+elif page == "📦 New Arrival":
+    st.title("📦 New Arrival")
+    st.write(f"📅 Date: **{data['new_arrival']['date']}**")
 
-# Category filter
-if "Category" in merged_df.columns:
-    categories = ["All"] + sorted(merged_df["Category"].dropna().unique().tolist())
-    selected_category = st.sidebar.selectbox("Select Category", categories)
-    if selected_category != "All":
-        merged_df = merged_df[merged_df["Category"] == selected_category]
+    if not arrival_df.empty:
+        st.dataframe(arrival_df, use_container_width=True)
+    else:
+        st.warning("No new arrival data found.")
 
-# Toggle to show aging data
-show_aging = st.sidebar.checkbox("Show Aging Data (Safa Aging.xlsx)", value=False)
+# ==========================================
+# PAGE 3 — SEARCH ITEM
+# ==========================================
+elif page == "🔍 Search Item":
+    st.title("🔍 Search for Item or Barcode")
 
-# --- MAIN SECTION ---
-st.title("📊 Healthy Stock & Safety Factor Dashboard")
+    # Search input
+    query = st.text_input("Enter Item Name or Barcode").strip().lower()
 
-st.markdown("""
-This dashboard calculates **Safety Factor (Months of Cover)** for each item:
-> 🧮 `Months of Cover = Current Stock / Average Monthly Sales`
+    if query:
+        # Search both datasets
+        stock_results = stock_df[
+            stock_df.apply(lambda row: query in str(row.get("itembarcode", "")).lower() or
+                           query in str(row.get("description", "")).lower(), axis=1)
+        ]
+        arrival_results = arrival_df[
+            arrival_df.apply(lambda row: query in str(row.get("itembarcode", "")).lower() or
+                             query in str(row.get("description", "")).lower(), axis=1)
+        ]
 
-- **< 1 month:** ⚠️ Low stock (reorder soon)  
-- **1–3 months:** ✅ Healthy stock  
-- **> 3 months:** 📦 Overstock
-""")
+        # Display results
+        if not stock_results.empty or not arrival_results.empty:
+            if not stock_results.empty:
+                st.subheader("📦 Found in Warehouse Stock")
+                st.dataframe(stock_results, use_container_width=True)
+            if not arrival_results.empty:
+                st.subheader("🆕 Found in New Arrivals")
+                st.dataframe(arrival_results, use_container_width=True)
+        else:
+            st.warning("No matching items found in either stock or new arrival data.")
+    else:
+        st.info("Type an item name or barcode to search.")
 
-# --- TOP 100 ITEMS ---
-top_items = merged_df.sort_values("Safety Factor (Months of Cover)", ascending=False).head(100)
-
-# --- HORIZONTAL BAR CHART ---
-fig = px.bar(
-    top_items,
-    x="Safety Factor (Months of Cover)",
-    y="Item Name",
-    color="Category" if "Category" in top_items.columns else None,
-    orientation="h",
-    title="Top 100 Items by Safety Factor (Months of Cover)",
-    labels={"Safety Factor (Months of Cover)": "Months of Cover", "Item Name": "Item"},
-)
-fig.update_layout(yaxis={'categoryorder': 'total ascending'}, height=1500)
-st.plotly_chart(fig, use_container_width=True)
-
-# --- DATA TABLE ---
-st.subheader("📋 Item-wise Safety Factor Data")
-st.dataframe(top_items[["Item Name", "Category", "Stock", "Average Monthly Sales", "Safety Factor (Months of Cover)"]])
-
-# --- AGING DATA SECTION ---
-if show_aging and not aging_df.empty:
-    st.subheader("📅 Safa Stock Aging Report")
-    st.dataframe(aging_df)
+# ==========================================
+# OPTIONAL: SHOW JSON STRUCTURE
+# ==========================================
+with st.expander("🧾 View JSON Data Structure"):
+    st.json(data)
