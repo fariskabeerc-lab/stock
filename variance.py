@@ -143,10 +143,15 @@ st.markdown("""
     justify-content: center;
     margin-bottom: 20px;
 }
-/* Updated Aggressive CSS: 
-    Targets the container (often a div) holding the Download button,
-    which is typically the second child in the stDataFrameToolbar. 
-*/
+
+/* 🎯 AGGRESSIVE DOWNLOAD BUTTON HIDING 🎯 */
+
+/* 1. Target by common test ID and fully remove the element */
+[data-testid="stDownloadButton"] {
+    display: none !important;
+}
+
+/* 2. Target the container div that holds the download button (often the second child of the toolbar) */
 [data-testid^="stDataFrameToolbar"] > div:nth-child(2) {
     display: none !important; 
 }
