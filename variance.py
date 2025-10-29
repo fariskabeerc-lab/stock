@@ -143,8 +143,9 @@ st.markdown("""
     justify-content: center;
     margin-bottom: 20px;
 }
-/* Hide the download button across all dataframes */
-[data-testid="stDownloadButton"] {
+/* Hide the download button: targets the second button in the dataframe toolbar */
+/* This is a more robust fix for the "Download as CSV" button */
+[data-testid^="stDataFrameToolbar"] button:nth-child(2) {
     display: none !important;
 }
 </style>
