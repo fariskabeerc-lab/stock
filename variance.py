@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-import numpy as np # Keep import for potential use, though not strictly required after previous changes
+import numpy as np 
 
 # ==========================================
 # PAGE CONFIG
@@ -48,10 +48,7 @@ def load_excel(file_path):
             # Rename the found cost column to a standardized internal name
             df = df.rename(columns={cost_col_match[0]: COST_COLUMN_FOUND})
         else:
-            # --- CHANGE: DO NOT SHOW WARNING, just ensure the internal column exists ---
-            # If the cost column isn't found (which is expected for New Arrival), 
-            # we create the standardized column with missing values (pd.NA).
-            # This allows the rest of the app logic to run without errors.
+            # If the cost column isn't found, we silently create the standardized column with missing values (pd.NA).
             df[COST_COLUMN_FOUND] = pd.NA
             
         return df
@@ -82,7 +79,7 @@ data = {
 
 
 # ==========================================
-# HELPER FUNCTION FOR DISPLAY FORMATTING (CORE CHANGE)
+# HELPER FUNCTION FOR DISPLAY FORMATTING
 # ==========================================
 def create_overview_df(df, show_cost_in_table=False):
     """
@@ -96,7 +93,6 @@ def create_overview_df(df, show_cost_in_table=False):
 
     # 1. Drop the sensitive COST_COLUMN_FOUND if we are NOT showing it
     if not show_cost_in_table and COST_COLUMN_FOUND in df_display.columns:
-        # **This is the critical line that hides the cost column when show_cost_in_table is False**
         df_display = df_display.drop(columns=[COST_COLUMN_FOUND])
     
     # 2. Rename the standardized cost column for display if it's being shown
@@ -159,7 +155,6 @@ st.markdown("""
     margin-bottom: 20px;
 }
 /* 🎯 AGGRESSIVE DOWNLOAD BUTTON HIDING 🎯 */
-/* We keep this to prevent easy data export */
 [data-testid="stDownloadButton"],
 [data-testid^="stDataFrameToolbar"] > div:nth-child(2) {
     display: none !important;
@@ -178,8 +173,7 @@ query = st.text_input(
 # ==========================================
 if query:
     st.subheader(f"Search Results for: **'{query}'**")
-    # Tell the user why the cost column is visible now
-    st.success(f"✅ **{COST_COLUMN.upper()}** column is visible in search results.")
+    # THE SUCCESS MESSAGE IS REMOVED HERE
     
     # 1. Search warehouse stock (using original, unfiltered DF)
     results_stock = stock_df[
@@ -198,13 +192,13 @@ if query:
         # Display Stock results: show_cost_in_table=True
         if not results_stock.empty:
             st.markdown("### 🏬 Found in Warehouse Stock")
-            # PASSING 'show_cost_in_table=True' to reveal the cost column
+            # Cost is visible in search (show_cost_in_table=True)
             st.dataframe(create_overview_df(results_stock, show_cost_in_table=True), use_container_width=True)
         
         # Display Arrival results: show_cost_in_table=True
         if not results_arrival.empty:
             st.markdown("### 🆕 Found in New Arrivals")
-            # PASSING 'show_cost_in_table=True' to reveal the cost column
+            # Cost is visible in search (show_cost_in_table=True)
             st.dataframe(create_overview_df(results_arrival, show_cost_in_table=True), use_container_width=True)
     else:
         st.warning(f"❌ No matching items found for **'{query}'** in either dataset.")
