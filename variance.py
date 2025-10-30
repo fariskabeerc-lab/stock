@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import numpy as np # Keep import for potential use, though not strictly required after previous changes
 
 # ==========================================
 # PAGE CONFIG
@@ -30,25 +31,27 @@ COST_COLUMN_FOUND = "internal_cost" # Internal standardized name for the sensiti
 
 
 # ==========================================
-# LOAD DATA FUNCTION
+# LOAD DATA FUNCTION (MODIFIED TO SILENTLY HANDLE MISSING COST COLUMN)
 # ==========================================
 @st.cache_data
 def load_excel(file_path):
     try:
         df = pd.read_excel(file_path)
-        # 1. Clean column names by stripping whitespace and converting to lowercase for robust matching
+        # 1. Clean column names by stripping whitespace
         original_cols = df.columns.tolist()
         df.columns = df.columns.str.strip()
         
-        # 2. Find and standardize the cost column name
+        # 2. Find and standardize the cost column name (case-insensitive)
         cost_col_match = [col for col in original_cols if col.strip().lower() == COST_COLUMN]
         
         if cost_col_match:
             # Rename the found cost column to a standardized internal name
             df = df.rename(columns={cost_col_match[0]: COST_COLUMN_FOUND})
         else:
-            st.warning(f"⚠️ Column '{COST_COLUMN}' not found in {file_path}. Cost logic may fail.")
-            # Ensure the standardized column exists, even if empty, to prevent errors
+            # --- CHANGE: DO NOT SHOW WARNING, just ensure the internal column exists ---
+            # If the cost column isn't found (which is expected for New Arrival), 
+            # we create the standardized column with missing values (pd.NA).
+            # This allows the rest of the app logic to run without errors.
             df[COST_COLUMN_FOUND] = pd.NA
             
         return df
@@ -59,7 +62,7 @@ def load_excel(file_path):
 # ==========================================
 # READ BOTH FILES
 # ==========================================
-# Load the dataframes. They will be empty if the file loading fails.
+# Load the dataframes.
 stock_df = load_excel(files["warehouse_stock"]["path"])
 arrival_df = load_excel(files["new_arrival"]["path"])
 
@@ -128,7 +131,6 @@ if CATEGORY_COLUMN in stock_df.columns and CATEGORY_COLUMN in arrival_df.columns
     )
     
     if selected_category != "All Categories":
-        # Note: Filtering happens on the original dataframes loaded in step 2
         filtered_stock_df = stock_df[stock_df[CATEGORY_COLUMN].astype(str).str.strip() == selected_category]
         filtered_arrival_df = arrival_df[arrival_df[CATEGORY_COLUMN].astype(str).str.strip() == selected_category]
     else:
@@ -175,10 +177,9 @@ query = st.text_input(
 # ==========================================
 if query:
     st.subheader(f"Search Results for: **'{query}'**")
-    st.success(f"✅ Displaying **{COST_COLUMN_FOUND.replace('_', ' ').upper()}** column in search results.")
+    st.success(f"✅ Displaying **{COST_COLUMN.upper()}** column in search results (will show missing values if cost data is unavailable).")
     
     # 1. Search warehouse stock (using original, unfiltered DF)
-    # Search logic remains the same, operating on the standardized DFs
     results_stock = stock_df[
         stock_df.apply(lambda row: query in str(row.get("itembarcode", "")).lower() or
                                  query in str(row.get("description", "")).lower(), axis=1)
@@ -201,7 +202,7 @@ if query:
         # Display Arrival results: show_cost_in_table=True
         if not results_arrival.empty:
             st.markdown("### 🆕 Found in New Arrivals")
-            # Cost is visible in search
+            # Cost is visible in search (but will be empty/NaN since the column wasn't in the source file)
             st.dataframe(create_overview_df(results_arrival, show_cost_in_table=True), use_container_width=True)
     else:
         st.warning(f"❌ No matching items found for **'{query}'** in either dataset.")
@@ -244,3 +245,22 @@ else:
             st.info(f"No items found in New Arrivals for category: **{selected_category}**.")
         else:
             st.warning(f"⚠️ Could not display data from **{files['new_arrival']['path']}**.")
+
+### Key Change Summary
+
+The warning is removed by modifying the `load_excel` function:
+
+```python
+# Old code:
+# if cost_col_match:
+#     ... rename ...
+# else:
+#     st.warning(f"⚠️ Column '{COST_COLUMN}' not found in {file_path}. Cost logic may fail.")
+#     df[COST_COLUMN_FOUND] = pd.NA
+    
+# New code:
+if cost_col_match:
+    # ... rename ...
+else:
+    # If the cost column isn't found, we silently create the standardized column with missing values (pd.NA).
+    df[COST_COLUMN_FOUND] = pd.NA
