@@ -22,6 +22,14 @@ files = {
 }
 
 # ==========================================
+# CONFIGURATION CONSTANTS
+# ==========================================
+CATEGORY_COLUMN = "Category" # Column used for sidebar filtering
+COST_COLUMN = "cost"         # The sensitive column to control visibility
+# SELLING_COLUMN and MAX_ITEMS_TO_SHOW_COST are removed as they are no longer needed.
+
+
+# ==========================================
 # LOAD DATA FUNCTION
 # ==========================================
 @st.cache_data
@@ -30,6 +38,9 @@ def load_excel(file_path):
         df = pd.read_excel(file_path)
         # Clean column names by stripping whitespace
         df.columns = df.columns.str.strip()
+        # Ensure cost column exists (important for logic)
+        if COST_COLUMN not in df.columns:
+            st.warning(f"⚠️ Column '{COST_COLUMN}' not found in {file_path}. Cost logic may fail.")
         return df
     except Exception as e:
         st.error(f"❌ Error loading {file_path}. Please ensure the file exists and is readable: {e}")
@@ -56,37 +67,26 @@ data = {
     }
 }
 
-# ==========================================
-# CONFIGURATION CONSTANTS FOR DISPLAY/FILTERING
-# ==========================================
-CATEGORY_COLUMN = "Category" # Column used for sidebar filtering
-COST_COLUMN = "cost"         # The sensitive column
-SELLING_COLUMN = "selling"   # New column name for 'cost' for display
-MAX_ITEMS_TO_SHOW_COST = 4   # THE NEW THRESHOLD
-
 
 # ==========================================
 # HELPER FUNCTION FOR DISPLAY FORMATTING
 # ==========================================
-def create_overview_df(df, show_cost=False):
+def create_overview_df(df, show_cost_in_table=False):
     """
     Creates a copy of the DataFrame for the main table overview.
-    Conditionally includes the cost column based on the show_cost flag.
+    Drops the Category column and conditionally drops the cost column.
     """
     if df.empty:
         return pd.DataFrame()
         
     df_display = df.copy()
 
-    # 1. Rename Cost Column to Selling for a clean presentation (if it exists)
-    if COST_COLUMN in df_display.columns:
-        df_display = df_display.rename(columns={COST_COLUMN: SELLING_COLUMN})
+    # 1. Drop the sensitive COST_COLUMN if we are NOT showing it
+    if not show_cost_in_table and COST_COLUMN in df_display.columns:
+        # Note: We are dropping the 'cost' column directly to hide it.
+        df_display = df_display.drop(columns=[COST_COLUMN])
 
-    # 2. Drop the sensitive column if we are NOT showing cost (and it exists)
-    if not show_cost and SELLING_COLUMN in df_display.columns:
-        df_display = df_display.drop(columns=[SELLING_COLUMN])
-
-    # 3. Drop Category Column (Requested by user)
+    # 2. Drop Category Column (Requested by user)
     if CATEGORY_COLUMN in df_display.columns:
         df_display = df_display.drop(columns=[CATEGORY_COLUMN])
         
@@ -94,7 +94,7 @@ def create_overview_df(df, show_cost=False):
 
 
 # ==========================================
-# SIDEBAR FILTERING
+# SIDEBAR FILTERING (Unmodified)
 # ==========================================
 st.sidebar.title("Filter Options")
 
@@ -156,11 +156,11 @@ query = st.text_input(
 ).strip().lower()
 
 # ==========================================
-# SEARCH LOGIC AND DISPLAY
-# NOTE: Search results always hide the cost for safety, regardless of size.
+# SEARCH LOGIC AND DISPLAY (COST IS VISIBLE HERE)
 # ==========================================
 if query:
     st.subheader(f"Search Results for: **'{query}'**")
+    st.success(f"✅ Displaying **{COST_COLUMN}** column in search results.")
     
     # 1. Search warehouse stock (using original, unfiltered DF)
     results_stock = stock_df[
@@ -176,20 +176,20 @@ if query:
 
     if not results_stock.empty or not results_arrival.empty:
         
-        # Display Stock results (Cost is hidden for search results)
+        # Display Stock results: show_cost_in_table=True
         if not results_stock.empty:
             st.markdown("### 🏬 Found in Warehouse Stock")
-            st.dataframe(create_overview_df(results_stock, show_cost=False), use_container_width=True)
+            st.dataframe(create_overview_df(results_stock, show_cost_in_table=True), use_container_width=True)
         
-        # Display Arrival results (Cost is hidden for search results)
+        # Display Arrival results: show_cost_in_table=True
         if not results_arrival.empty:
             st.markdown("### 🆕 Found in New Arrivals")
-            st.dataframe(create_overview_df(results_arrival, show_cost=False), use_container_width=True)
+            st.dataframe(create_overview_df(results_arrival, show_cost_in_table=True), use_container_width=True)
     else:
         st.warning(f"❌ No matching items found for **'{query}'** in either dataset.")
         
 # ==========================================
-# TABBED PAGE VIEWS (If no search query is active)
+# TABBED PAGE VIEWS (If no search query is active) (COST IS HIDDEN HERE)
 # ==========================================
 else:
     # Determine the status text based on category selection
@@ -197,21 +197,15 @@ else:
 
     tab1, tab2 = st.tabs(["🏬 Warehouse Stock", "🆕 New Arrival"])
 
+    st.warning(f"⚠️ **{COST_COLUMN}** column is hidden in the standard tab view.")
+    
     with tab1:
         st.subheader("🏬 Warehouse Stock")
         st.write(f"📅 Last Updated: **{data['stock']['date']}** {filter_status}")
 
         if not filtered_stock_df.empty:
-            # Check the new condition: Show cost if item count is below threshold
-            show_stock_cost = len(filtered_stock_df) < MAX_ITEMS_TO_SHOW_COST
-            
-            if show_stock_cost:
-                st.success(f"✅ Showing **{SELLING_COLUMN}** price (Item count: {len(filtered_stock_df)})")
-            else:
-                st.warning(f"⚠️ Hiding **{SELLING_COLUMN}** price (Item count: {len(filtered_stock_df)}). Threshold is {MAX_ITEMS_TO_SHOW_COST} items.")
-
-            # Display filtered stock, applying display formatting and conditional cost visibility
-            stock_overview_df = create_overview_df(filtered_stock_df, show_cost=show_stock_cost)
+            # Display filtered stock: show_cost_in_table=False (DEFAULT: COST IS HIDDEN)
+            stock_overview_df = create_overview_df(filtered_stock_df, show_cost_in_table=False)
             st.dataframe(stock_overview_df, use_container_width=True)
             
         elif not stock_df.empty:
@@ -224,16 +218,8 @@ else:
         st.write(f"📅 Last Updated: **{data['new_arrival']['date']}** {filter_status}")
 
         if not filtered_arrival_df.empty:
-            # Check the new condition: Show cost if item count is below threshold
-            show_arrival_cost = len(filtered_arrival_df) < MAX_ITEMS_TO_SHOW_COST
-            
-            if show_arrival_cost:
-                st.success(f"✅ Showing **{SELLING_COLUMN}** price (Item count: {len(filtered_arrival_df)})")
-            else:
-                st.warning(f"⚠️ Hiding **{SELLING_COLUMN}** price (Item count: {len(filtered_arrival_df)}). Threshold is {MAX_ITEMS_TO_SHOW_COST} items.")
-
-            # Display filtered arrival, applying display formatting and conditional cost visibility
-            arrival_overview_df = create_overview_df(filtered_arrival_df, show_cost=show_arrival_cost)
+            # Display filtered arrival: show_cost_in_table=False (DEFAULT: COST IS HIDDEN)
+            arrival_overview_df = create_overview_df(filtered_arrival_df, show_cost_in_table=False)
             st.dataframe(arrival_overview_df, use_container_width=True)
             
         elif not arrival_df.empty:
