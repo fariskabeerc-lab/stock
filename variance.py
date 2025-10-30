@@ -82,7 +82,7 @@ data = {
 
 
 # ==========================================
-# HELPER FUNCTION FOR DISPLAY FORMATTING
+# HELPER FUNCTION FOR DISPLAY FORMATTING (CORE CHANGE)
 # ==========================================
 def create_overview_df(df, show_cost_in_table=False):
     """
@@ -96,7 +96,7 @@ def create_overview_df(df, show_cost_in_table=False):
 
     # 1. Drop the sensitive COST_COLUMN_FOUND if we are NOT showing it
     if not show_cost_in_table and COST_COLUMN_FOUND in df_display.columns:
-        # This is the core logic that removes the column when show_cost_in_table is False
+        # **This is the critical line that hides the cost column when show_cost_in_table is False**
         df_display = df_display.drop(columns=[COST_COLUMN_FOUND])
     
     # 2. Rename the standardized cost column for display if it's being shown
@@ -159,6 +159,7 @@ st.markdown("""
     margin-bottom: 20px;
 }
 /* 🎯 AGGRESSIVE DOWNLOAD BUTTON HIDING 🎯 */
+/* We keep this to prevent easy data export */
 [data-testid="stDownloadButton"],
 [data-testid^="stDataFrameToolbar"] > div:nth-child(2) {
     display: none !important;
@@ -177,7 +178,8 @@ query = st.text_input(
 # ==========================================
 if query:
     st.subheader(f"Search Results for: **'{query}'**")
-    st.success(f"✅ Displaying **{COST_COLUMN.upper()}** column in search results (will show missing values if cost data is unavailable).")
+    # Tell the user why the cost column is visible now
+    st.success(f"✅ **{COST_COLUMN.upper()}** column is visible in search results.")
     
     # 1. Search warehouse stock (using original, unfiltered DF)
     results_stock = stock_df[
@@ -196,13 +198,13 @@ if query:
         # Display Stock results: show_cost_in_table=True
         if not results_stock.empty:
             st.markdown("### 🏬 Found in Warehouse Stock")
-            # Cost is visible in search
+            # PASSING 'show_cost_in_table=True' to reveal the cost column
             st.dataframe(create_overview_df(results_stock, show_cost_in_table=True), use_container_width=True)
         
         # Display Arrival results: show_cost_in_table=True
         if not results_arrival.empty:
             st.markdown("### 🆕 Found in New Arrivals")
-            # Cost is visible in search (but will be empty/NaN since the column wasn't in the source file)
+            # PASSING 'show_cost_in_table=True' to reveal the cost column
             st.dataframe(create_overview_df(results_arrival, show_cost_in_table=True), use_container_width=True)
     else:
         st.warning(f"❌ No matching items found for **'{query}'** in either dataset.")
@@ -216,6 +218,7 @@ else:
 
     tab1, tab2 = st.tabs(["🏬 Warehouse Stock", "🆕 New Arrival"])
 
+    # Explicit warning that cost is hidden in the main view
     st.warning(f"⚠️ **{COST_COLUMN.upper()}** column is hidden in the standard tab view. Use the search bar to reveal cost for specific items.")
     
     with tab1:
@@ -245,22 +248,3 @@ else:
             st.info(f"No items found in New Arrivals for category: **{selected_category}**.")
         else:
             st.warning(f"⚠️ Could not display data from **{files['new_arrival']['path']}**.")
-
-### Key Change Summary
-
-The warning is removed by modifying the `load_excel` function:
-
-```python
-# Old code:
-# if cost_col_match:
-#     ... rename ...
-# else:
-#     st.warning(f"⚠️ Column '{COST_COLUMN}' not found in {file_path}. Cost logic may fail.")
-#     df[COST_COLUMN_FOUND] = pd.NA
-    
-# New code:
-if cost_col_match:
-    # ... rename ...
-else:
-    # If the cost column isn't found, we silently create the standardized column with missing values (pd.NA).
-    df[COST_COLUMN_FOUND] = pd.NA
